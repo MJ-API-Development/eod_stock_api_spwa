@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarketData API | Institutional-Grade Financial Data</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0f172a',
+                        secondary: '#fbbf24',
+                        accent: '#1e293b',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['IBM Plex Mono', 'monospace'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .chart-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.1;
+            z-index: 0;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .api-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-active {
+            background-color: #10b981;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 1);
+            animation: pulse-slow 2s infinite;
+        }
+        
+        .status-inactive {
+            background-color: #ef4444;
+        }
+        
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .pricing-card {
+            transition: all 0.3s ease;
+            border: 1px solid #334155;
+        }
+        
+        .pricing-card:hover {
+            transform: translateY(-10px);
+            border-color: #fbbf24;
+        }
+        
+        .pricing-highlight {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .pricing-highlight::before {
+            content: 'POPULAR';
+            position: absolute;
+            top: 15px;
+            right: -35px;
+            width: 150px;
+            padding: 2px 0;
+            background: #fbbf24;
+            color: #0f172a;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+            transform: rotate(45deg);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+    </style>
+</head>
+<body class="bg-primary text-white font-sans antialiased">
+    <!-- Sticky Navigation -->
+    <nav class="sticky top-0 z-50 bg-primary border-b border-slate-700 backdrop-blur-md bg-opacity-90">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <i class="fas fa-chart-line text-secondary text-2xl mr-2"></i>
+                        <span class="text-xl font-bold">Market<span class="text-secondary">Data</span>API</span>
+                    </div>
+                    <div class="hidden md:block">
+                        <div class="ml-10 flex items-baseline space-x-6">
+                            <a href="#services" class="px-3 py-2 rounded-md text-sm font-medium hover:text-secondary transition">Services</a>
+                            <a href="#advantages" class="px-3 py-2 rounded-md text-sm font-medium hover:text-secondary transition">Advantages</a>
+                            <a href="#pricing" class="px-3 py-2 rounded-md text-sm font-medium hover:text-secondary transition">Pricing</a>
+                            <a href="#developers" class="px-3 py-2 rounded-md text-sm font-medium hover:text-secondary transition">Developers</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <div class="mr-4 flex items-center text-sm">
+                        <span class="api-status status-active"></span>
+                        <span>API Status: <span class="font-mono text-green-400">Operational</span></span>
+                    </div>
+                    <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-800">
+                        <i class="fas fa-moon text-yellow-300"></i>
+                    </button>
+                    <a href="#" class="ml-4 bg-secondary hover:bg-yellow-500 text-primary font-bold py-2 px-4 rounded-md transition">
+                        Get API Keys
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="gradient-bg relative overflow-hidden">
+        <div class="chart-container" id="hero-chart"></div>
+        <div class="container mx-auto px-4 py-24 relative z-10">
+            <div class="max-w-3xl mx-auto text-center">
+                <h1 class="text-4xl md:text-6xl font-bold mb-6">
+                    Power Your Fintech with <span class="text-secondary">Institutional-Grade</span> Market Data
+                </h1>
+                <p class="text-xl text-slate-300 mb-10 max-w-2xl mx-auto">
+                    Real-time stocks, historical EOD data, financial news & unified API access
+                </p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <a href="#" class="bg-secondary hover:bg-yellow-500 text-primary font-bold py-3 px-8 rounded-md text-lg transition duration-300">
+                        Get Started
+                    </a>
+                    <a href="#services" class="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-8 rounded-md text-lg transition duration-300">
+                        Explore Services
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Services Showcase -->
+    <section id="services" class="py-20 bg-slate-900">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Integrated Financial Data Services</h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">
+                    A comprehensive suite of APIs designed for modern financial applications
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <!-- EOD Stock API -->
+                <div class="card-hover bg-slate-800 rounded-xl p-6 border border-slate-700">
+                    <div class="feature-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">EOD Stock API</h3>
+                    <p class="text-slate-400 mb-4">Historical pricing, OHLC data, dividends, splits and more</p>
+                    <ul class="mb-6 text-slate-300 space-y-2">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Global market coverage</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>30+ years historical data</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Adjusted & unadjusted prices</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="text-secondary font-medium hover:underline inline-flex items-center">
+                        View Repository
+                        <i class="fas fa-arrow-right ml-2 text-sm"></i>
+                    </a>
+                </div>
+                
+                <!-- Real-time Stocks -->
+                <div class="card-hover bg-slate-800 rounded-xl p-6 border border-slate-700">
+                    <div class="feature-icon">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Real-time Stocks</h3>
+                    <p class="text-slate-400 mb-4">WebSocket streaming, Level 2 data, and ultra-low latency</p>
+                    <ul class="mb-6 text-slate-300 space-y-2">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Millisecond latency</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Full order book data</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>50+ global exchanges</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="text-secondary font-medium hover:underline inline-flex items-center">
+                        View Repository
+                        <i class="fas fa-arrow-right ml-2 text-sm"></i>
+                    </a>
+                </div>
+                
+                <!-- Financial News -->
+                <div class="card-hover bg-slate-800 rounded-xl p-6 border border-slate-700">
+                    <div class="feature-icon">
+                        <i class="fas fa-newspaper"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Financial News</h3>
+                    <p class="text-slate-400 mb-4">Sentiment analysis, filters, and global news aggregation</p>
+                    <ul class="mb-6 text-slate-300 space-y-2">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Real-time news streams</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>AI-powered sentiment scoring</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Source and topic filters</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="text-secondary font-medium hover:underline inline-flex items-center">
+                        View Repository
+                        <i class="fas fa-arrow-right ml-2 text-sm"></i>
+                    </a>
+                </div>
+                
+                <!-- Unified Gateway -->
+                <div class="card-hover bg-slate-800 rounded-xl p-6 border border-slate-700">
+                    <div class="feature-icon">
+                        <i class="fas fa-code-branch"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Unified Gateway</h3>
+                    <p class="text-slate-400 mb-4">Single endpoint, rate management, and unified data model</p>
+                    <ul class="mb-6 text-slate-300 space-y-2">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Consolidated API access</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Advanced rate limiting</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Usage analytics dashboard</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="text-secondary font-medium hover:underline inline-flex items-center">
+                        View Repository
+                        <i class="fas fa-arrow-right ml-2 text-sm"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Technical Advantages -->
+    <section id="advantages" class="py-20 bg-primary">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Technical Advantages</h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">
+                    Engineered for performance, reliability, and scalability
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="bg-slate-800 p-8 rounded-xl border border-slate-700">
+                    <h3 class="text-2xl font-bold mb-4">Low-Latency Infrastructure</h3>
+                    <p class="text-slate-400 mb-6">
+                        Our globally distributed infrastructure ensures market data delivery in milliseconds, 
+                        with redundant systems for 99.9% uptime.
+                    </p>
+                    <div class="flex flex-wrap gap-4 mb-6">
+                        <div class="bg-slate-700 px-4 py-2 rounded-lg">
+                            <span class="text-secondary font-mono">≤15ms</span> avg latency
+                        </div>
+                        <div class="bg-slate-700 px-4 py-2 rounded-lg">
+                            <span class="text-secondary font-mono">99.9%</span> uptime
+                        </div>
+                        <div class="bg-slate-700 px-4 py-2 rounded-lg">
+                            <span class="text-secondary font-mono">12</span> global regions
+                        </div>
+                    </div>
+                    <div class="relative h-64 rounded-lg overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-r from-primary to-slate-900 flex items-center justify-center">
+                            <div class="text-center p-4">
+                                <div class="text-xl font-bold mb-2">Infrastructure Diagram</div>
+                                <div class="flex justify-center space-x-8">
+                                    <div class="text-center">
+                                        <div class="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-server text-secondary"></i>
+                                        </div>
+                                        <span>Edge Nodes</span>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-network-wired text-secondary"></i>
+                                        </div>
+                                        <span>Aggregators</span>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-cloud text-secondary"></i>
+                                        </div>
+                                        <span>Cloud API</span>
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <div class="h-1 bg-gradient-to-r from-secondary to-primary rounded-full"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-2xl font-bold mb-4">Developer Experience</h3>
+                    <p class="text-slate-400 mb-6">
+                        Clean, consistent APIs with comprehensive documentation and SDKs for all major languages.
+                    </p>
+                    
+                    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden mb-6">
+                        <div class="bg-slate-900 px-4 py-2 border-b border-slate-700 flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500 mr-4"></div>
+                            <span class="text-sm text-slate-400 font-mono">python_example.py</span>
+                        </div>
+                        <div class="p-4 font-mono text-sm">
+                            <div class="text-purple-400">import</div>
+                            <div class="ml-4 text-green-400">marketdata</div><br>
+                            
+                            <div class="text-blue-400"># Initialize client with API key</div>
+                            <div class="text-slate-300">client = marketdata.Client(</div>
+                            <div class="ml-4 text-slate-300">api_key=<span class="text-yellow-300">"YOUR_API_KEY"</span></div>
+                            <div class="text-slate-300">)</div><br>
+                            
+                            <div class="text-blue-400"># Fetch real-time quote</div>
+                            <div class="text-slate-300">quote = client.realtime.quote(</div>
+                            <div class="ml-4 text-slate-300">symbol=<span class="text-yellow-300">"AAPL"</span></div>
+                            <div class="text-slate-300">)</div><br>
+                            
+                            <div class="text-slate-300">print(<span class="text-yellow-300">f"Apple Inc: ${quote.price} ({quote.change_pct}%)"</span>)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <a href="#" class="bg-slate-800 hover:bg-slate-700 rounded-lg p-4 flex items-center transition">
+                            <i class="fab fa-python text-2xl mr-3 text-blue-400"></i>
+                            <div>
+                                <div class="font-medium">Python SDK</div>
+                                <div class="text-sm text-slate-400">v3.2.1</div>
+                            </div>
+                        </a>
+                        <a href="#" class="bg-slate-800 hover:bg-slate-700 rounded-lg p-4 flex items-center transition">
+                            <i class="fab fa-js text-2xl mr-3 text-yellow-400"></i>
+                            <div>
+                                <div class="font-medium">JavaScript SDK</div>
+                                <div class="text-sm text-slate-400">v2.4.0</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Tiers -->
+    <section id="pricing" class="py-20 bg-slate-900">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Simple, Transparent Pricing</h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">
+                    Flexible plans for startups, growing businesses, and enterprises
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                <!-- Free Tier -->
+                <div class="pricing-card bg-slate-800 rounded-xl p-8 flex flex-col">
+                    <h3 class="text-2xl font-bold mb-2">Developer</h3>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold">$0</span>
+                        <span class="text-slate-400">/month</span>
+                    </div>
+                    <p class="text-slate-400 mb-6">Ideal for individual developers and small projects</p>
+                    <ul class="mb-8 text-slate-300 space-y-3 flex-grow">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>100 requests/day</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>EOD data only</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Basic news access</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Community support</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 rounded-md text-center transition">
+                        Get Started
+                    </a>
+                </div>
+                
+                <!-- Pro Tier -->
+                <div class="pricing-card pricing-highlight bg-slate-800 rounded-xl p-8 flex flex-col">
+                    <h3 class="text-2xl font-bold mb-2">Professional</h3>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold">$299</span>
+                        <span class="text-slate-400">/month</span>
+                    </div>
+                    <p class="text-slate-400 mb-6">For growing applications and businesses</p>
+                    <ul class="mb-8 text-slate-300 space-y-3 flex-grow">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>10,000 requests/day</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Real-time WebSocket access</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Advanced news with sentiment</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Priority support</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Custom rate limits</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="bg-secondary hover:bg-yellow-500 text-primary font-bold py-3 rounded-md text-center transition">
+                        Start Free Trial
+                    </a>
+                </div>
+                
+                <!-- Enterprise Tier -->
+                <div class="pricing-card bg-slate-800 rounded-xl p-8 flex flex-col">
+                    <h3 class="text-2xl font-bold mb-2">Enterprise</h3>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold">Custom</span>
+                    </div>
+                    <p class="text-slate-400 mb-6">Tailored solutions for institutions</p>
+                    <ul class="mb-8 text-slate-300 space-y-3 flex-grow">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Unlimited requests</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Direct exchange feeds</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Historical tick data</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>Dedicated infrastructure</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-secondary mr-2 mt-1"></i>
+                            <span>24/7 technical support</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 rounded-md text-center transition">
+                        Contact Sales
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Developer Experience -->
+    <section id="developers" class="py-20 bg-primary">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Developer Experience</h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">
+                    Tools and resources to accelerate your development
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
+                <div>
+                    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                        <div class="bg-slate-900 px-4 py-2 border-b border-slate-700 flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500 mr-4"></div>
+                            <span class="text-sm text-slate-400 font-mono">api_playground.js</span>
+                        </div>
+                        <div class="p-6">
+                            <div class="mb-6">
+                                <div class="flex mb-4">
+                                    <button class="bg-secondary text-primary px-4 py-2 rounded-l-md font-medium">GET</button>
+                                    <input type="text" class="bg-slate-700 px-4 py-2 flex-grow rounded-r-md font-mono" value="/v1/stocks/AAPL/quote">
+                                </div>
+                                <button class="bg-secondary hover:bg-yellow-500 text-primary font-medium py-2 px-6 rounded-md">
+                                    Send Request
+                                </button>
+                            </div>
+                            
+                            <div class="bg-slate-900 rounded-lg p-4 font-mono text-sm max-h-64 overflow-auto">
+                                <div>{</div>
+                                <div class="ml-4">"symbol": <span class="text-yellow-300">"AAPL"</span>,</div>
+                                <div class="ml-4">"name": <span class="text-yellow-300">"Apple Inc."</span>,</div>
+                                <div class="ml-4">"price": <span class="text-green-400">172.35</span>,</div>
+                                <div class="ml-4">"change": <span class="text-green-400">+2.15</span>,</div>
+                                <div class="ml-4">"change_pct": <span class="text-green-400">+1.26</span>,</div>
+                                <div class="ml-4">"volume": <span class="text-blue-400">45293100</span>,</div>
+                                <div class="ml-4">"last_updated": <span class="text-yellow-300">"2023-07-15T20:59:59Z"</span></div>
+                                <div>}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8 grid grid-cols-2 gap-4">
+                        <a href="#" class="bg-slate-800 hover:bg-slate-700 rounded-lg p-4 flex items-center transition">
+                            <i class="fas fa-book text-2xl mr-3 text-purple-400"></i>
+                            <div>
+                                <div class="font-medium">API Documentation</div>
+                                <div class="text-sm text-slate-400">Swagger-based</div>
+                            </div>
+                        </a>
+                        <a href="#" class="bg-slate-800 hover:bg-slate-700 rounded-lg p-4 flex items-center transition">
+                            <i class="fas fa-graduation-cap text-2xl mr-3 text-blue-400"></i>
+                            <div>
+                                <div class="font-medium">Tutorials</div>
+                                <div class="text-sm text-slate-400">Guides & examples</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-2xl font-bold mb-6">Trusted by Financial Innovators</h3>
+                    <p class="text-slate-400 mb-8">
+                        Our infrastructure meets the highest standards for security, compliance, and reliability.
+                    </p>
+                    
+                    <div class="grid grid-cols-2 gap-6 mb-10">
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+                            <div class="text-5xl font-bold text-secondary mb-3">99.9%</div>
+                            <div class="text-lg">Uptime SLA</div>
+                        </div>
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+                            <div class="text-5xl font-bold text-secondary mb-3">256-bit</div>
+                            <div class="text-lg">SSL Encryption</div>
+                        </div>
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+                            <div class="text-5xl font-bold text-secondary mb-3">ISO 27001</div>
+                            <div class="text-lg">Certified</div>
+                        </div>
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+                            <div class="text-5xl font-bold text-secondary mb-3">GDPR</div>
+                            <div class="text-lg">Compliant</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                        <div class="flex items-start mb-4">
+                            <div class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fas fa-user text-secondary"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold">Sarah Johnson</div>
+                                <div class="text-slate-400 text-sm">CTO, FinTech Innovations</div>
+                            </div>
+                        </div>
+                        <p class="text-slate-300 italic">
+                            "MarketData API has been instrumental in powering our trading platform. The real-time 
+                            data feeds are reliable, and their unified API saved us months of development time."
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 pt-16 pb-8">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+                <div>
+                    <div class="flex items-center mb-6">
+                        <i class="fas fa-chart-line text-secondary text-2xl mr-2"></i>
+                        <span class="text-xl font-bold">Market<span class="text-secondary">Data</span>API</span>
+                    </div>
+                    <p class="text-slate-400 mb-6">
+                        Institutional-grade financial data APIs for developers and businesses.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-slate-400 hover:text-secondary transition">
+                            <i class="fab fa-github"></i>
+                        </a>
+                        <a href="#" class="text-slate-400 hover:text-secondary transition">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="text-slate-400 hover:text-secondary transition">
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-bold mb-6">Products</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">EOD Stock API</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">Real-time Stocks</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">Financial News</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">Unified Gateway</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">Pricing</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-bold mb-6">Developers</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">Documentation</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">API Reference</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">SDKs</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">API Status</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">Support</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-bold mb-6">Company</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">About</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">Blog</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">Careers</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">Contact</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-secondary transition">Legal</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="pt-8 border-t border-slate-800 text-center text-slate-500 text-sm">
+                <p>&copy; 2023 MarketData API. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize the stock chart in hero section
+        document.addEventListener('DOMContentLoaded', function() {
+            // Hero chart
+            const ctx = document.getElementById('hero-chart').getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 30}, (_, i) => i + 1),
+                    datasets: [{
+                        data: Array.from({length: 30}, () => Math.floor(Math.random() * 100) + 50),
+                        borderColor: '#fbbf24',
+                        backgroundColor: 'rgba(251, 191, 36, 0.05)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: false,
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            display: false,
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Update chart data every 5 seconds to simulate live data
+            setInterval(() => {
+                chart.data.datasets[0].data = chart.data.datasets[0].data.slice(1).concat([Math.floor(Math.random() * 100) + 50]);
+                chart.update();
+            }, 5000);
+            
+            // Dark/light mode toggle
+            const themeToggle = document.getElementById('theme-toggle');
+            themeToggle.addEventListener('click', () => {
+                const html = document.documentElement;
+                if (html.classList.contains('dark')) {
+                    html.classList.remove('dark');
+                    themeToggle.innerHTML = '<i class="fas fa-moon text-gray-700"></i>';
+                    localStorage.theme = 'light';
+                } else {
+                    html.classList.add('dark');
+                    themeToggle.innerHTML = '<i class="fas fa-sun text-yellow-300"></i>';
+                    localStorage.theme = 'dark';
+                }
+            });
+            
+            // Set initial theme based on user preference
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                themeToggle.innerHTML = '<i class="fas fa-sun text-yellow-300"></i>';
+            } else {
+                document.documentElement.classList.remove('dark');
+                themeToggle.innerHTML = '<i class="fas fa-moon text-gray-700"></i>';
+            }
+            
+            // Smooth scrolling for anchor links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
